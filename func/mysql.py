@@ -1,4 +1,5 @@
 import mysql.connector
+from selenium_facebook.consts import consts
 
 class MySQLDatabase:
     def __init__(self, config):
@@ -31,8 +32,12 @@ class MySQLDatabase:
         cursor.execute(query)
         return cursor
 
-    def select_all(self, table, limit):
-        query = f"SELECT * FROM {table} LIMIT {limit}"
+    def select_all(self, table, where = None, limit = consts.MYSQL_MAX_ROW):
+        query = f"SELECT * FROM {table}"
+        if where not in  [None, ""]:
+            query += f" WHERE {where}"
+        if limit not in [0, None]:
+            query += f" LIMIT {limit}"
         cursor = self.execute_query(query)
         rows = cursor.fetchall()
         return rows
@@ -51,6 +56,14 @@ class MySQLDatabase:
         self.connection.commit()
         return cursor.lastrowid
 
+    def insert_batch(self, table, data_list):
+        columns = ', '.join(data_list[0].keys())
+        values = ', '.join([', '.join([f"'{value}'" for value in data.values()]) for data in data_list])
+        query = f"INSERT INTO {table} ({columns}) VALUES {values}"
+        cursor = self.execute_query(query)
+        self.connection.commit()
+        return cursor.lastrowid
+
     def update(self, table, id, data):
         set_values = ', '.join([f"{key} = '{value}'" for key, value in data.items()])
         query = f"UPDATE {table} SET {set_values} WHERE id = {id}"
@@ -64,27 +77,34 @@ class MySQLDatabase:
         self.connection.commit()
         return cursor.rowcount
 
-# Usage example:
-# database = MySQLDatabase('localhost', 'root', 'password', 'mydatabase')
-# database.connect()
-#
-# # Select all rows from a table
-# rows = database.select_all('mytable')
-# for row in rows:
-#     print(row)
-#
-# # Insert a new row into a table
-# data = {'name': 'John', 'age': 30, 'email': 'john@example.com'}
-# new_id = database.insert('mytable', data)
-# print("New row ID:", new_id)
-#
-# # Update a row in a table
-# data = {'name': 'Jane', 'age': 25, 'email': 'jane@example.com'}
-# updated_rows = database.update('mytable', 1, data)
-# print("Updated rows:", updated_rows)
-#
-# # Delete a row from a table
-# deleted_rows = database.delete('mytable', 2)
-# print("Deleted rows:", deleted_rows)
-#
-# database.disconnect()
+    # 获取用户数据
+    def get_user_data(self):
+        user_data_list = self.select_all(consts.FB_AD_USER, "status = 2")
+        if len(user_data_list) == 0:
+            return None
+        rows = []
+        for row in user_data_list:
+            rows.append({
+                "username": row["username"],
+                "password": row["password"],
+                "secret":   row["secret"],
+            })
+        return rows
+
+    # 获取关键字信息
+    def get_keyword(self, keyword_id):
+        keyword_data_list = self.select_all(consts.FB_AD_KEYWORD, f" id > {keyword_id} and status in (2, 1) and is_crawling in(2, 1) ", 1)
+        if len(keyword_data_list) > 0:
+            return keyword_data_list["id"], keyword_data_list["keyword"], keyword_data_list["page"]
+        else:
+            return None, None, None
+
+    # 获取国家数据信息
+    def get_country_data(self):
+        country_data_list = self.select_all(consts.FB_AD_COUNTRY, " status = 2 ")
+        if len(country_data_list) == 0:
+            return None
+        country_code_list = []
+        for row in country_data_list:
+            country_code_list.append(row["country_code"])
+        return country_code_list

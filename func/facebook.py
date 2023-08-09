@@ -41,7 +41,7 @@ class Facebook:
         # 跳转页面
         self.driver.get("https://www.facebook.com/login")
 
-        # 获取账号密码
+        # 账号池中随机获取账号密码
         username, password, secret = self.redis_client.get_account()
         if username is None or password is None:
             print("账户名密码为空")
@@ -119,10 +119,12 @@ class Facebook:
 
                 # 数据存进redis
                 self.redis_client.ad_push({
-                    "advertiser":advertiser,
+                    "advertiser": advertiser,
                     "ad_content": ad_content,
                     "advertiser_url": advertiser_url,
                     "advertiser_domain": advertiser_domain,
+                    "keyword": keyword,
+                    "country": country,
                 })
 
         except StaleElementReferenceException:
