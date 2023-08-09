@@ -1,11 +1,11 @@
 import mysql.connector
 
 class MySQLDatabase:
-    def __init__(self, host, user, password, database):
-        self.host = host
-        self.user = user
-        self.password = password
-        self.database = database
+    def __init__(self, config):
+        self.host = config.get("Mysql", "host")
+        self.user = config.get("Mysql", "username")
+        self.password = config.get("Mysql", "password")
+        self.database = config.get("Mysql", "db")
         self.connection = None
 
     def connect(self):

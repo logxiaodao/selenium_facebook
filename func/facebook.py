@@ -14,50 +14,62 @@ from urllib.parse import unquote
 import common
 from selenium.webdriver.chrome.options import Options
 import requests
+import redis_func
 
 
 class Facebook:
     # 初始化
-    def __init__(self, config_file):
-        self.config = configparser.ConfigParser()
-        self.config.read(config_file)
-        self.current_index = 1
+    def __init__(self, redis_client):
+        # # 初始化redis
+        self.redis_client = redis_client
+        # 浏览器初始化及打开
         chrome_options = Options()
         chrome_options.add_argument("--incognito")  # 无痕 （兼容并发登陆退出）
         self.driver = webdriver.Chrome(options=chrome_options)
 
-    # 顺序获取账号密码（不能并发 仅自测使用）
-    def get_next_credentials(self):
-        if f"CredentialSet{self.current_index}" in self.config:
-            username = self.config.get(f"CredentialSet{self.current_index}", "username")
-            password = self.config.get(f"CredentialSet{self.current_index}", "password")
-            secret = self.config.get(f"CredentialSet{self.current_index}", "secret")
-            self.current_index += 1
-            return username, password, secret
-        else:
-            self.current_index = 1
-            if f"CredentialSet{self.current_index}" in self.config:
-                username = self.config.get(f"CredentialSet{self.current_index}", "username")
-                password = self.config.get(f"CredentialSet{self.current_index}", "password")
-                secret = self.config.get(f"CredentialSet{self.current_index}", "secret")
-                self.current_index += 1
-                return username, password, secret
-            else:
-                return None, None
+    # 设置浏览器cookie信息
+    def set_cookie(self, cookie):
+        cookie = {
+            'name': 'c_user',
+            'value': cookie
+        }
+        self.driver.add_cookie(cookie)
+        self.driver.refresh()
 
     # 登录
-    def login(self, email, password, secret):
+    def login(self):
+        # 跳转页面
         self.driver.get("https://www.facebook.com/login")
-        # 填慢一点，避免facebook怀疑
+
+        # 获取账号密码
+        username, password, secret = self.redis_client.get_account()
+        if username is None or password is None:
+            print("账户名密码为空")
+            return
+
+        # 获取cookie缓存 如果有缓存则设置cookie
+        cookie = self.redis_client.get_cookie(username)
+        if cookie is not None:
+            self.set_cookie(cookie)
+            return
+
+        # 没有缓存则正常登陆
         email_field = self.driver.find_element(By.ID, "email")
-        email_field.send_keys(email)
+        email_field.send_keys(username)
         password_field = self.driver.find_element(By.ID, "pass")
         password_field.send_keys(password)
         password_field.send_keys(Keys.RETURN)
         WebDriverWait(self.driver, 10).until(EC.url_contains("facebook.com"))
-        #  二次验证
+
+        # 将cookie缓存起来
+        self.redis_client.set_cookie(username, cookie)
+
+        # 登陆之后如果需要二次验证，进行二次验证
         if self.is_secondary_validation():
             time.sleep(5)
+            if secret is None:
+                print(f"{username}的secret是空的")
+                return
             self.secondary_validation(secret)
 
     # 退出登录
@@ -75,7 +87,6 @@ class Facebook:
         # 滚动页面以加载更多广告
         self.scroll_page(page_size)
 
-        data = []
         try:
             ad_elements = self.driver.find_elements(By.CSS_SELECTOR, "._7jvw.x2izyaf.x1hq5gj4.x1d52u69")
             if len(ad_elements) == 0:
@@ -106,14 +117,14 @@ class Facebook:
                 if advertiser_url:
                     advertiser_domain = urlparse(advertiser_url).netloc  # 独立站域名
 
-                data = data.append({
+                # 数据存进redis
+                self.redis_client.ad_push({
                     "advertiser":advertiser,
                     "ad_content": ad_content,
                     "advertiser_url": advertiser_url,
                     "advertiser_domain": advertiser_domain,
                 })
 
-            return data
         except StaleElementReferenceException:
             logging.info("发生异常:", StaleElementReferenceException)
 
@@ -159,7 +170,7 @@ class Facebook:
             button = self.driver.find_element(By.ID, "checkpointSubmitButton")
             button.click()
 
-
+    # 判断是否需要二次验证
     def is_secondary_validation(self):
         # 获取当前域名
         current_url = self.driver.current_url
@@ -178,5 +189,6 @@ class Facebook:
 
         return False
 
+    # 关闭页面
     def close(self):
         self.driver.quit()
