@@ -23,6 +23,7 @@ class MySQLDatabase:
 
     def execute_query(self, query):
         cursor = self.connection.cursor()
+        print(query)
         cursor.execute(query)
         return cursor
 
@@ -101,7 +102,7 @@ class MySQLDatabase:
     def get_keyword(self, keyword_id):
         keyword_data_list = self.select_all(consts.FB_AD_KEYWORD, f" id > {keyword_id} and status in (2, 1) and is_crawling in(2, 1) ", 1)
         if len(keyword_data_list) > 0:
-            return keyword_data_list["id"], keyword_data_list["keyword"], keyword_data_list["page"]
+            return keyword_data_list[0]["id"], keyword_data_list[0]["keyword"], keyword_data_list[0]["page"]
         else:
             return None, None, None
 

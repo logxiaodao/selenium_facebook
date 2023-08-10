@@ -39,38 +39,37 @@ def generate_advertising(mysql_client, redis_client):
     if country_list is None or len(country_list) == 0:
         return
 
-    while True:
-        # 获取关键字标记(轮转关键字)  这一块需要并发不安全，加锁顺序执行
-        keyword_id = redis_client.get(redis_key.keyword_id_key())
-        if keyword_id is None:
-            keyword_id = 0
+    # 获取关键字标记(轮转关键字)  这一块需要并发不安全，加锁顺序执行
+    keyword_id = int(redis_client.get(redis_key.keyword_id_key()))
+    if keyword_id is None:
+        keyword_id = 0
 
-        # 获取一个关键字
-        keyword_id, keyword, page_size = mysql_client.get_keyword(keyword_id)
-        if keyword is None or page_size is None:
-            redis_client.set(redis_key.keyword_id_key(), 0)
-            return
-        redis_client.set(redis_key.keyword_id_key(), keyword_id + 1)
+    # 获取一个关键字
+    keyword_id, keyword, page_size = mysql_client.get_keyword(keyword_id)
+    if keyword is None or page_size is None:
+        redis_client.set(redis_key.keyword_id_key(), 0)
+        return
+    redis_client.set(redis_key.keyword_id_key(), keyword_id + 1)
 
-        # 初始化facebook配置
-        fb = facebook.Facebook(redis_client)
+    # 初始化facebook配置
+    fb = facebook.Facebook(redis_client)
 
-        # 登陆
-        fb.login()
+    # 登陆
+    fb.login()
 
-        # 一个关键字 爬取多个国家的数据
-        for country in country_list:
-            # 爬取广告
-            fb.scrape_ad_information(country, keyword, page_size)
+    # 一个关键字 爬取多个国家的数据
+    for country in country_list:
+        # 爬取广告
+        fb.scrape_ad_information(country, keyword, page_size)
 
-            # 休眠一段时间
-            time.sleep(common.random_int())
+        # 休眠一段时间
+        time.sleep(common.random_int())
 
-        # 退出登陆
-        fb.logout()
+    # 退出登陆
+    fb.logout()
 
-        # 关闭浏览器
-        fb.close()
+    # 关闭浏览器
+    fb.close()
 
 
 # 协程任务把爬取的广告写进mysql
@@ -84,9 +83,6 @@ def mv_advertising(mysql_client, redis_client):
     # 获取 redis 数据
     ad_data_list = redis_client.ad_range(number)
     if len(ad_data_list) == 0:
-        print("休眠20秒")
-        # 没有数据 暂时休眠
-        time.sleep(20)
         return
 
     # 转化成mysql的数据
@@ -137,12 +133,14 @@ def run():
     country_data = mysql_client.get_country_data()
     redis_client.set_country(country_data)
 
+    #generate_advertising(mysql_client, redis_client)
     # 创建调度器 添加定时任务，每隔10秒执行一次
     scheduler = BlockingScheduler()
-    scheduler.add_job(functools.partial(mv_advertising, mysql_client, redis_client), 'interval', seconds=10)
+    scheduler.add_job(functools.partial(generate_advertising, mysql_client, redis_client), 'interval', minutes=5)
+    scheduler.add_job(functools.partial(mv_advertising, mysql_client, redis_client), 'interval', seconds=20)
     scheduler.start()
 
-    generate_advertising(mysql_client, redis_client)
+
 
 if __name__ == '__main__':
     run()
