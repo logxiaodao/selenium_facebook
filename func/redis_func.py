@@ -20,7 +20,7 @@ class RedisClient:
         # 删除国家数据
         self.redis.delete(redis_key.country_key())
         # 初始化国家数据
-        self.redis.sadd(redis_key.country_key(), rows)
+        self.redis.sadd(redis_key.country_key(), *rows)
         pass
 
     # 获取国家列表
@@ -37,9 +37,12 @@ class RedisClient:
     # 设置账号信息
     def set_account(self, rows):
         # 删除账号数据
-        self.redis.delete(redis_key.account_key())
+        if self.redis.exists(redis_key.account_key()):
+            self.redis.delete(redis_key.account_key())
+
+        rows = [str(item) for item in rows]
         # 初始化账号数据
-        self.redis.sadd(redis_key.account_key(), rows)
+        self.redis.sadd(redis_key.account_key(), *rows)
 
     # 随机获取账号密码
     def get_account(self):

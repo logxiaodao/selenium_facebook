@@ -15,6 +15,7 @@ import common
 from selenium.webdriver.chrome.options import Options
 import requests
 import redis_func
+import asyncio
 
 
 class Facebook:
@@ -145,6 +146,8 @@ class Facebook:
                 break
             last_height = new_height
             scroll_count += 1
+
+        time.sleep(2)
 
     # 获取验证码
     def query_code(self, fa2_secret):

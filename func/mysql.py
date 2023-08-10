@@ -3,19 +3,13 @@ from selenium_facebook.consts import consts
 
 class MySQLDatabase:
     def __init__(self, config):
-        self.host = config.get("Mysql", "host")
-        self.user = config.get("Mysql", "username")
-        self.password = config.get("Mysql", "password")
-        self.database = config.get("Mysql", "db")
-        self.connection = None
-
-    def connect(self):
         try:
             self.connection = mysql.connector.connect(
-                host=self.host,
-                user=self.user,
-                password=self.password,
-                database=self.database
+                host=config.get("Mysql", "host"),
+                port=config.get("Mysql", "port"),
+                user=config.get("Mysql", "username"),
+                password=config.get("Mysql", "password"),
+                database=config.get("Mysql", "db")
             )
             if self.connection.is_connected():
                 print("Connected to MySQL database")
@@ -33,14 +27,26 @@ class MySQLDatabase:
         return cursor
 
     def select_all(self, table, where = None, limit = consts.MYSQL_MAX_ROW):
-        query = f"SELECT * FROM {table}"
+        query = f"SELECT * FROM {table} "
         if where not in  [None, ""]:
-            query += f" WHERE {where}"
+            query += f" WHERE {where} "
         if limit not in [0, None]:
-            query += f" LIMIT {limit}"
+            query += f" LIMIT {limit} "
         cursor = self.execute_query(query)
         rows = cursor.fetchall()
-        return rows
+
+        # 获取列名信息
+        columns = [column[0] for column in cursor.description]
+
+        # 将每一行的数据与列名进行组合，生成字典
+        results = []
+        for row in rows:
+            data = {}
+            for i, value in enumerate(row):
+                data[columns[i]] = value
+            results.append(data)
+
+        return results
 
     def select_by_id(self, table, id):
         query = f"SELECT * FROM {table} WHERE id = {id}"
@@ -62,7 +68,7 @@ class MySQLDatabase:
         query = f"INSERT INTO {table} ({columns}) VALUES {values}"
         cursor = self.execute_query(query)
         self.connection.commit()
-        return cursor.lastrowid
+        return cursor.rowcount
 
     def update(self, table, id, data):
         set_values = ', '.join([f"{key} = '{value}'" for key, value in data.items()])
@@ -79,7 +85,7 @@ class MySQLDatabase:
 
     # 获取用户数据
     def get_user_data(self):
-        user_data_list = self.select_all(consts.FB_AD_USER, "status = 2")
+        user_data_list = self.select_all(consts.FB_AD_USER, " status = 2 ")
         if len(user_data_list) == 0:
             return None
         rows = []
@@ -101,7 +107,7 @@ class MySQLDatabase:
 
     # 获取国家数据信息
     def get_country_data(self):
-        country_data_list = self.select_all(consts.FB_AD_COUNTRY, " status = 2 ")
+        country_data_list = self.select_all(consts.FB_AD_COUNTRY, " is_crawling = 2 ")
         if len(country_data_list) == 0:
             return None
         country_code_list = []
