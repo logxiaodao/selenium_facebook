@@ -16,6 +16,7 @@ from selenium.webdriver.chrome.options import Options
 import requests
 import redis_func
 import asyncio
+import json
 
 
 class Facebook:
@@ -39,39 +40,42 @@ class Facebook:
 
     # 登录
     def login(self):
-        # 跳转页面
-        self.driver.get("https://www.facebook.com/login")
-
         # 账号池中随机获取账号密码
         username, password, secret = self.redis_client.get_account()
         if username is None or password is None:
             print("账户名密码为空")
             return
 
-        # 获取cookie缓存 如果有缓存则设置cookie
+        # 跳转页面
+        self.driver.get("https://www.facebook.com/login")
+
+        # 获取cookie缓存 设置cookie
         cookie = self.redis_client.get_cookie(username)
         if cookie is not None:
-            self.set_cookie(cookie)
-            return
+            cookies = json.loads(cookie)
+            for ck in cookies:
+                self.driver.add_cookie(ck)
+        else:
+            # 没有cookie缓存则走登陆流程
+            email_field = self.driver.find_element(By.ID, "email")
+            email_field.send_keys(username)
+            password_field = self.driver.find_element(By.ID, "pass")
+            password_field.send_keys(password)
+            password_field.send_keys(Keys.RETURN)
+            WebDriverWait(self.driver, 10).until(EC.url_contains("facebook.com"))
 
-        # 没有缓存则正常登陆
-        email_field = self.driver.find_element(By.ID, "email")
-        email_field.send_keys(username)
-        password_field = self.driver.find_element(By.ID, "pass")
-        password_field.send_keys(password)
-        password_field.send_keys(Keys.RETURN)
-        WebDriverWait(self.driver, 10).until(EC.url_contains("facebook.com"))
+            # 登陆之后如果需要二次验证，进行二次验证
+            if self.is_secondary_validation():
+                time.sleep(5)
+                if secret is None:
+                    print(f"{username}的secret是空的")
+                    return
+                self.secondary_validation(secret)
 
-        # 将cookie缓存起来
-        self.redis_client.set_cookie(username, cookie)
-
-        # 登陆之后如果需要二次验证，进行二次验证
-        if self.is_secondary_validation():
-            time.sleep(5)
-            if secret is None:
-                print(f"{username}的secret是空的")
-                return
-            self.secondary_validation(secret)
+            # 将cookie缓存起来
+            cookies = self.driver.get_cookies()
+            json_str = json.dumps(cookies, indent=4, ensure_ascii=False)
+            self.redis_client.set_cookie(username, json_str)
 
     # 退出登录
     def logout(self):
@@ -80,8 +84,10 @@ class Facebook:
 
     # 爬取广告
     def scrape_ad_information(self, country, keyword, page_size):
+        country = country.decode('utf-8', errors='ignore')
+        print(f"开始爬取数据，关键字：{keyword}， 国家：{country}")
         time.sleep(2)  # 等两秒在跳转
-        url = f"https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country={country}&q={keyword}&sort_data[direction]=desc&sort_data[mode]=relevancy_monthly_grouped&search_type=keyword_unordered&media_type=all"
+        url = f"https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country={country}&q={keyword}&search_type=keyword_unordered&media_type=all"
         self.driver.get(url)
         time.sleep(2)
 
@@ -98,13 +104,11 @@ class Facebook:
                 # 广告内容
                 ad_content_elements = ad_element.find_elements(By.CSS_SELECTOR, "._4ik4._4ik5")
                 if len(ad_content_elements) > 0:
-                    print("广告内容获取到的元素数量", len(ad_content_elements))
                     ad_content = ad_content_elements[1].text
 
                 # 广告商
                 advertiser_elements = ad_element.find_elements(By.CSS_SELECTOR,".x8t9es0.x1fvot60.xxio538.x108nfp6.xq9mrsl.x1h4wwuj.x117nqv4.xeuugli")
                 if len(advertiser_elements) > 0:
-                    print("广告商获取到的元素数量", len(advertiser_elements))
                     advertiser = advertiser_elements[0].text
 
                 # 落地页
@@ -112,21 +116,24 @@ class Facebook:
                 if len(advertiser_url_elements) == 0:
                     continue
 
-                print("落地页获取到的元素数量", len(advertiser_url_elements))
                 advertiser_url = unquote(advertiser_url_elements[0].get_attribute("href"))
                 advertiser_url = common.remove_facebook_redirect(advertiser_url)
                 if advertiser_url:
                     advertiser_domain = urlparse(advertiser_url).netloc  # 独立站域名
 
-                # 数据存进redis
-                self.redis_client.ad_push({
+                data = {
                     "advertiser": advertiser,
                     "ad_content": ad_content,
                     "advertiser_url": advertiser_url,
                     "advertiser_domain": advertiser_domain,
                     "keyword": keyword,
                     "country": country,
-                })
+                }
+                print(data)
+
+                # 不在过滤域名中，数据存进redis
+                if not self.redis_client.in_filter_domain(data["advertiser_domain"]):
+                    self.redis_client.ad_push(json.dumps(data))
 
         except StaleElementReferenceException:
             logging.info("发生异常:", StaleElementReferenceException)
