@@ -64,14 +64,6 @@ class MySQLDatabase:
         self.connection.commit()
         return cursor.lastrowid
 
-    # def insert_batch(self, table, data_list):
-    #     columns = ', '.join(data_list[0].keys())
-    #     values = ', '.join([', '.join([f"`{value}`" for value in data.values()]) for data in data_list])
-    #     query = f"INSERT IGNORE INTO {table} ({columns}) VALUES ({values})"
-    #     cursor = self.execute_query(query)
-    #     self.connection.commit()
-    #     return cursor.rowcount
-
     def insert_batch(self, table, data_list):
         columns = ', '.join(data_list[0].keys())
         placeholders = ', '.join(['%s'] * len(data_list[0]))
@@ -136,3 +128,7 @@ class MySQLDatabase:
         for row in filter_domain_list:
             domain_list.append(row["domain"])
         return domain_list
+
+    # 断开 mysql 连接
+    def close(self):
+        self.connection.close()

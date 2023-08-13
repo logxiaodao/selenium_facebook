@@ -131,3 +131,7 @@ class RedisClient:
             self.redis.delete(redis_lock_key)
         else:
             logging.info("无法释放锁，锁已过期或被其他进程持有")
+
+    # 断开 redis 连接
+    def close(self):
+        self.redis.close()

@@ -11,10 +11,10 @@ import datetime
 from urllib.parse import urlparse
 from selenium.common.exceptions import StaleElementReferenceException
 from urllib.parse import unquote
-import common
+from  selenium_facebook.func import common
 from selenium.webdriver.chrome.options import Options
 import requests
-import redis_func
+import selenium_facebook.func.redis_func
 import asyncio
 import json
 
@@ -27,16 +27,11 @@ class Facebook:
         # 浏览器初始化及打开
         chrome_options = Options()
         chrome_options.add_argument("--incognito")  # 无痕 （兼容并发登陆退出）
+        # chrome_options.add_argument('--headless')
+        # path = "/Users/longxiangjun/data/code/py/selenium_facebook/chromedriver"
+        # service = webdriver.ChromeService(path)
+        # self.driver = webdriver.Chrome(service=service, options=chrome_options)
         self.driver = webdriver.Chrome(options=chrome_options)
-
-    # 设置浏览器cookie信息
-    def set_cookie(self, cookie):
-        cookie = {
-            'name': 'c_user',
-            'value': cookie
-        }
-        self.driver.add_cookie(cookie)
-        self.driver.refresh()
 
     # 登录
     def login(self):
@@ -103,8 +98,10 @@ class Facebook:
                 ad_content, advertiser, advertiser_url, advertiser_domain = "", "", "", ""
                 # 广告内容
                 ad_content_elements = ad_element.find_elements(By.CSS_SELECTOR, "._4ik4._4ik5")
-                if len(ad_content_elements) > 0:
+                if len(ad_content_elements) > 1:
                     ad_content = ad_content_elements[1].text
+                elif len(ad_content_elements) == 1:
+                    ad_content = ad_content_elements[0].text
 
                 # 广告商
                 advertiser_elements = ad_element.find_elements(By.CSS_SELECTOR,".x8t9es0.x1fvot60.xxio538.x108nfp6.xq9mrsl.x1h4wwuj.x117nqv4.xeuugli")
@@ -146,6 +143,7 @@ class Facebook:
         # 滚动到页面底部
         last_height = self.driver.execute_script("return document.body.scrollHeight")
         while scroll_count <= max_scrolls:
+            print(f"滚动页面中：第{scroll_count+1}次滚动")
             self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
             time.sleep(common.random_int())  # 休眠一个随机时间 避免被facebook 发现规律
             new_height = self.driver.execute_script("return document.body.scrollHeight")
