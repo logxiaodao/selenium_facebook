@@ -103,21 +103,29 @@ class MySQLDatabase:
 
     # 获取关键字信息
     def get_keyword(self, keyword_id):
-        keyword_data_list = self.select_all(consts.FB_AD_KEYWORD, f" id > {keyword_id} and `status` in ({consts.FB_AD_KEYWORD_STATUS_ON},{consts.FB_AD_KEYWORD_STATUS_DEFAULT}) and `is_crawling` in({consts.FB_AD_KEYWORD_IS_CRAWLING_DEFAULT},{consts.FB_AD_KEYWORD_IS_CRAWLING_YES}) ", 1)
+        keyword_data_list = self.select_all(consts.OMS_KEYWORD, f" keyword_id > {keyword_id} and `status` in ({consts.OMS_KEYWORD_STATUS_ON},{consts.OMS_KEYWORD_STATUS_DEFAULT}) and `is_crawling` in({consts.OMS_KEYWORD_IS_CRAWLING_DEFAULT},{consts.OMS_KEYWORD_IS_CRAWLING_YES}) ", 1)
         if len(keyword_data_list) > 0:
-            return keyword_data_list[0]["id"], keyword_data_list[0]["keyword"], keyword_data_list[0]["page"]
+            return keyword_data_list[0]["keyword_id"], keyword_data_list[0]["name"], keyword_data_list[0]["page"]
         else:
             return None, None, None
 
+    # 获取关键字信息
+    # def get_keyword(self, keyword_id):
+    #     keyword_data_list = self.select_all(consts.FB_AD_KEYWORD, f" id > {keyword_id} and `status` in ({consts.FB_AD_KEYWORD_STATUS_ON},{consts.FB_AD_KEYWORD_STATUS_DEFAULT}) and `is_crawling` in({consts.FB_AD_KEYWORD_IS_CRAWLING_DEFAULT},{consts.FB_AD_KEYWORD_IS_CRAWLING_YES}) ", 1)
+    #     if len(keyword_data_list) > 0:
+    #         return keyword_data_list[0]["id"], keyword_data_list[0]["keyword"], keyword_data_list[0]["page"]
+    #     else:
+    #         return None, None, None
+
     # 获取国家数据信息
-    def get_country_data(self):
-        country_data_list = self.select_all(consts.FB_AD_COUNTRY, f" is_crawling = {consts.FB_AD_COUNTRY_IS_CRAWLING_YES} ")
-        if len(country_data_list) == 0:
-            return None
-        country_code_list = []
-        for row in country_data_list:
-            country_code_list.append(row["country_code"])
-        return country_code_list
+    # def get_country_data(self):
+    #     country_data_list = self.select_all(consts.FB_AD_COUNTRY, f" is_crawling = {consts.FB_AD_COUNTRY_IS_CRAWLING_YES} ")
+    #     if len(country_data_list) == 0:
+    #         return None
+    #     country_code_list = []
+    #     for row in country_data_list:
+    #         country_code_list.append(row["country_code"])
+    #     return country_code_list
 
     # 获取过滤信息
     def get_filter_domain(self, rule):

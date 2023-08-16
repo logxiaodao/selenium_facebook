@@ -27,10 +27,10 @@ class Facebook:
         # 浏览器初始化及打开
         chrome_options = Options()
         chrome_options.add_argument("--incognito")  # 无痕 （兼容并发登陆退出）
-        # chrome_options.add_argument('--headless')
-        # path = "/Users/longxiangjun/data/code/py/selenium_facebook/chromedriver"
-        # service = webdriver.ChromeService(path)
-        # self.driver = webdriver.Chrome(service=service, options=chrome_options)
+        chrome_options.add_argument('--headless')
+        path = "/Users/longxiangjun/data/code/py/selenium_facebook/chromedriver"
+        service = webdriver.ChromeService(path)
+        self.driver = webdriver.Chrome(service=service, options=chrome_options)
         self.driver = webdriver.Chrome(options=chrome_options)
 
     # 登录
@@ -79,7 +79,7 @@ class Facebook:
 
     # 爬取广告
     def scrape_ad_information(self, country, keyword, page_size):
-        country = country.decode('utf-8', errors='ignore')
+        # country = country.decode('utf-8', errors='ignore')
         print(f"开始爬取数据，关键字：{keyword}， 国家：{country}")
         time.sleep(2)  # 等两秒在跳转
         url = f"https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country={country}&q={keyword}&search_type=keyword_unordered&media_type=all"

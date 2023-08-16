@@ -50,9 +50,9 @@ def generate_advertising(config):
 
         print(f"generate_advertising start， time：{datetime.datetime.now()}")
         # 获取国家列表
-        country_list = redis_client.get_country()
-        if country_list is None or len(country_list) == 0:
-            return
+        # country_list = redis_client.get_country()
+        # if country_list is None or len(country_list) == 0:
+        #     return
 
         # 获取关键字标记(轮转关键字)  这一块并发不安全，加锁顺序执行
         keyword_id = redis_client.get(redis_key.keyword_id_key())
@@ -78,17 +78,12 @@ def generate_advertising(config):
         # 登陆
         fb.login()
 
-        # 一个关键字 爬取多个国家的数据
-        for country in country_list:
-            # 未设置关键字页则给默认值
-            if page_size <= 0:
-                page_size = 20
+        # 未设置关键字页则给默认值
+        if page_size <= 0:
+            page_size = 40
 
-            # 爬取广告
-            fb.scrape_ad_information(country, keyword, page_size)
-
-            # 休眠一段时间
-            time.sleep(common.random_int())
+        # 爬取广告
+        fb.scrape_ad_information("ALL", keyword, page_size)
 
         # 退出登陆
         fb.logout()
@@ -195,10 +190,10 @@ def run():
         redis_client.close()
 
         # 调试爬取广告数据
-        # generate_advertising(config)
+        generate_advertising(config)
 
         # 调试 数据入库
-        # mv_advertising(config, 500)
+        mv_advertising(config, 500)
 
         # 创建调度器 添加定时任务，每隔20秒执行一次
         scheduler = BlockingScheduler()
@@ -217,8 +212,8 @@ def init_redis_data(mysql_client, redis_client):
     redis_client.set_account(user_data)
 
     # 初始化国家数据到redis
-    country_data = mysql_client.get_country_data()
-    redis_client.set_country(country_data)
+    # country_data = mysql_client.get_country_data()
+    # redis_client.set_country(country_data)
 
     # 初始化域名过滤数据到redis(模糊匹配)
     like_data = mysql_client.get_filter_domain(consts.FB_FILTER_DOMAIN_RULE_LIKE)
